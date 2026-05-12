@@ -21,7 +21,8 @@ class PrePaidController extends GetxController
   final PaginationModel pagination = PaginationModel(limit: 15);
   final RefreshController refreshCtl = RefreshController(initialRefresh: false);
   final StartController startCtl = Get.find<StartController>();
-  List<ClientPrepaidModel> ClientList = [];
+  // List<ClientPrepaidModel> ClientList = [];
+  final RxList<ClientPrepaidModel> ClientList = <ClientPrepaidModel>[].obs;
   ClientPrepaidModel? clientSelected;
   final NumberFormat numberFormat = NumberFormat('#,###');
 
@@ -70,29 +71,86 @@ class PrePaidController extends GetxController
     clientSelected = selectedClient;
   }
 
+  // Future<void> fetchClient() async {
+  //   int? branchId = await getbranchId();
+  //   int? user_id = await getUserId();
+
+  //   try {
+  //     isLoading.value = true;
+  //     final Map<String, dynamic> params = {
+  //       'branch_id': branchId,
+  //       'user_id': user_id,
+  //     };
+
+  //     final res = await Get.find<ApiService>().get(
+  //       EndPoints.getClient,
+  //       queryParameters: params,
+  //     );
+  //     final data = getPropertyFromJson(res.data, 'data');
+  //     ClientList = List.from(
+  //       (data as List).map((e) => ClientPrepaidModel.fromJson(e)),
+  //     );
+  //   } catch (e) {
+  //     if (isClosed) {
+  //       return;
+  //     }
+  //     ExceptionHandler.handleException(e);
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+  // Future<void> fetchClient() async {
+  //   int? branchId = await getbranchId();
+  //   int? user_id = await getUserId();
+  //   try {
+  //     isLoading.value = true;
+  //     final res = await Get.find<ApiService>().get(
+  //       EndPoints.getClient,
+  //       queryParameters: {'branch_id': branchId, 'user_id': user_id},
+  //     );
+  //     final data = getPropertyFromJson(res.data, 'data');
+  //     if (data == null || data is! List) {
+  //       ClientList.clear();
+  //       return;
+  //     }
+  //     ClientList.assignAll(
+  //       // ← assignAll instead of =
+  //       List.from((data).map((e) => ClientPrepaidModel.fromJson(e))),
+  //     );
+  //   } catch (e) {
+  //     if (isClosed) return;
+  //     ExceptionHandler.handleException(e);
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+
   Future<void> fetchClient() async {
     int? branchId = await getbranchId();
     int? user_id = await getUserId();
-
     try {
       isLoading.value = true;
-      final Map<String, dynamic> params = {
-        'branch_id': branchId,
-        'user_id': user_id,
-      };
-
       final res = await Get.find<ApiService>().get(
         EndPoints.getClient,
-        queryParameters: params,
+        queryParameters: {'branch_id': branchId, 'user_id': user_id},
       );
       final data = getPropertyFromJson(res.data, 'data');
-      ClientList = List.from(
-        (data as List).map((e) => ClientPrepaidModel.fromJson(e)),
-      );
-    } catch (e) {
-      if (isClosed) {
+
+      // ← ADD THIS to see what keys the API actually returns
+      if (data is List && data.isNotEmpty) {
+        print('CLIENT FIELDS: ${data.first.keys.toList()}');
+        print('CLIENT SAMPLE: ${data.first}');
+      }
+
+      if (data == null || data is! List) {
+        ClientList.clear();
         return;
       }
+      ClientList.assignAll(
+        List.from((data).map((e) => ClientPrepaidModel.fromJson(e))),
+      );
+    } catch (e) {
+      if (isClosed) return;
       ExceptionHandler.handleException(e);
     } finally {
       isLoading.value = false;
@@ -113,14 +171,21 @@ class PrePaidController extends GetxController
       });
 
       int? maxId = await DatabaseHelper.instance.getCollectedMaxId();
-      ClientList =
+      // ClientList =
+      //     ClientList.where(
+      //       (client) => client.id == clientSelected?.id,
+      //     ).toList();
+      final matched =
           ClientList.where(
             (client) => client.id == clientSelected?.id,
           ).toList();
+      if (matched.isEmpty) return;
 
       await DatabaseHelper.instance.insertCollected({
+        // 'id': maxId,
+        // 'client': ClientList[0].name + "(បង់ទុក)",
         'id': maxId,
-        'client': ClientList[0].name + "(បង់ទុក)",
+        'client': matched[0].name + "(បង់ទុក)",
         'loan_officer': user_id,
         'created_by_id': user_id,
         'branch': "",

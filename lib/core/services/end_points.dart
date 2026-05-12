@@ -43,7 +43,7 @@ class EndPoints {
   static String get getvillage => 'client/get_village';
 
   static String get clientStore => 'client/store';
-  static String get PaidLoan => 'report/loan/un_repayment_paidoff';
+  static String get PaidLoan => 'report/loan/un_repayment';
 
   static String get getProductType => 'loan/getProduct_type';
   static String get getRepaymentFrequencyType =>
@@ -52,5 +52,5 @@ class EndPoints {
   static String get reverse => 'loan/repayment/reverse';
   static String get getDeNoCo => 'loan/getdenoco';
 
-  static String get storeDeNoCo => 'loan/deno_store';
+  static String get storeDeNoCo => 'loan/storedenoco';
 }
