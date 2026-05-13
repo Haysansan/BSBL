@@ -47,9 +47,10 @@ class WrittenoffSheet extends StatelessWidget {
     try {
       int? user_id = await getUserId();
       int? maxId = await DatabaseHelper.instance.getCollectedMaxId();
+      final safeId = maxId ?? 1;
       try {
         await DatabaseHelper.instance.insertCollected({
-          'id': maxId,
+          'id': safeId,
           'client': WOLoan.client,
           'loan_officer': user_id,
           'created_by_id': user_id,
@@ -81,8 +82,7 @@ class WrittenoffSheet extends StatelessWidget {
       }
 
       dio.FormData formData = dio.FormData.fromMap({
-        // This static because of feature removed
-        'id': maxId,
+        'id': safeId,
         'client': WOLoan.client,
         'loan_officer': user_id,
         'created_by_id': user_id,
@@ -98,11 +98,18 @@ class WrittenoffSheet extends StatelessWidget {
         'description': "Post Repayment",
         'gateway_id': 1,
       });
-      await Get.find<ApiService>().post(
-        EndPoints.WrittenStore,
-        formData,
-        isShowLoading: true,
-      );
+      try {
+        await Get.find<ApiService>().post(
+          EndPoints.WrittenStore,
+          formData,
+          isShowLoading: true,
+        );
+      } on dio.DioException catch (e) {
+        if (e.type != dio.DioExceptionType.unknown) {
+          ExceptionHandler.handleException(e);
+          return;
+        }
+      }
 
       startCtl.onRefresh();
       DialogManager.showDialog(
