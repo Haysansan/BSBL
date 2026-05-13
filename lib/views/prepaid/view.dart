@@ -34,9 +34,10 @@ class PrePaidView extends GetView<PrePaidController> {
                       ),
                       SearchDropDown<ClientPrepaidModel>(
                         items: controller.ClientList,
-                        itemAsString:
-                            (item) =>
-                                '${item.client_code} - ${item.name}', // Convert StaffModel to String
+                        // itemAsString:
+                        //     (item) =>
+                        //         '${item.client_code} - ${item.name}', // Convert StaffModel to String
+                        itemAsString: (item) => item.name,
                         // onChanged: (value) {
                         //   controller
                         //       .onClientChanged(value as ClientPrepaidModel?);

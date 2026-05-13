@@ -8,17 +8,10 @@ class ClientPrepaidModel {
     required this.client_code,
   });
 
-  // factory ClientPrepaidModel.fromJson(Map<String,dynamic> json){
-  //   return ClientPrepaidModel(
-  //       id : json["id"] ?? "0",
-  //     name : json["name"] ?? 'N/A',
-  //     client_code: json["client_code"] ?? 'N/A',
-  //     );
-  // }
   factory ClientPrepaidModel.fromJson(Map<String, dynamic> json) {
     return ClientPrepaidModel(
-      id: json["id"]?.toString() ?? "0",
-      name: json["client"] ?? 'N/A', // ← API sends "client" not "name"
+      id: json["id"]?.toString() ?? "0", // ← convert int to String
+      name: json["name"] ?? 'N/A',
       client_code: json["client_code"] ?? 'N/A',
     );
   }
@@ -27,6 +20,7 @@ class ClientPrepaidModel {
     final Map<String, dynamic> data = new Map<String, dynamic>();
     data['id'] = this.id;
     data['name'] = this.name;
+    data['client_code'] = this.client_code;
     return data;
   }
 }

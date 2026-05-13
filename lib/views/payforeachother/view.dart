@@ -34,12 +34,20 @@ class PayfoeachotherView extends GetView<PayfoeachotherController> {
                         LocaleKeys.choosestaff.tr,
                         style: AppTextStyle.normalPrimaryRegular,
                       ),
+                      // SearchDropDown<StaffModel>(
+                      //   items: controller.StaffList,
+                      //   itemAsString:
+                      //       (item) =>
+                      //           item.name
+                      //               .toString(), // Convert StaffModel to String
+                      //   onChanged: (value) async {
+                      //     await controller.onStaffChanged(value);
+                      //   },
+                      //   selectedItem: controller.StaffSelected,
+                      // ),
                       SearchDropDown<StaffModel>(
                         items: controller.StaffList,
-                        itemAsString:
-                            (item) =>
-                                item.name
-                                    .toString(), // Convert StaffModel to String
+                        itemAsString: (item) => item.full_name,
                         onChanged: (value) async {
                           await controller.onStaffChanged(value);
                         },
@@ -67,9 +75,10 @@ class PayfoeachotherView extends GetView<PayfoeachotherController> {
                       ),
                       SearchDropDown<ClientPrepaidModel>(
                         items: controller.ClientList,
-                        itemAsString:
-                            (item) =>
-                                '${item.client_code} - ${item.name}', // Convert StaffModel to String
+                        // itemAsString:
+                        //     (item) =>
+                        //         '${item.client_code} - ${item.name}', // Convert StaffModel to String
+                        itemAsString: (item) => item.name,
                         onChanged: (value) {
                           controller.onClientChanged(value);
                         },

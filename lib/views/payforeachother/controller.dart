@@ -11,7 +11,8 @@ import 'package:apploan/models/models.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class PayfoeachotherController extends GetxController with GetSingleTickerProviderStateMixin {
+class PayfoeachotherController extends GetxController
+    with GetSingleTickerProviderStateMixin {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final TextEditingController totalAmountCtl = TextEditingController();
   final TextEditingController descriptionCtl = TextEditingController();
@@ -22,17 +23,23 @@ class PayfoeachotherController extends GetxController with GetSingleTickerProvid
   final PaginationModel pagination = PaginationModel(limit: 15);
   final RefreshController refreshCtl = RefreshController(initialRefresh: false);
   final StartController startCtl = Get.find<StartController>();
-  List<ClientPrepaidModel> ClientList = [];
+  // List<ClientPrepaidModel> ClientList = [];
+  final RxList<ClientPrepaidModel> ClientList = <ClientPrepaidModel>[].obs;
   ClientPrepaidModel? clientSelected;
   final NumberFormat numberFormat = NumberFormat('#,###');
-  List<StaffModel> StaffList = [];
+  // List<StaffModel> StaffList = [];
+  final RxList<StaffModel> StaffList = <StaffModel>[].obs;
   StaffModel? StaffSelected;
 
   @override
   void onInit() async {
     await fetchUser();
+    // await fetchClient(); dont load before staff is selected
     totalAmountCtl.addListener(() {
-      String text = totalAmountCtl.text.replaceAll(',', ''); // Remove existing commas
+      String text = totalAmountCtl.text.replaceAll(
+        ',',
+        '',
+      ); // Remove existing commas
       if (text.isNotEmpty) {
         String formattedText = numberFormat.format(int.parse(text));
         totalAmountCtl.value = totalAmountCtl.value.copyWith(
@@ -43,85 +50,248 @@ class PayfoeachotherController extends GetxController with GetSingleTickerProvid
     });
     super.onInit();
   }
+
   void updateClientList(String query) {
     // Implement your filtering logic based on the query
-    var filteredList = ClientList.where((client) {
-      return client.name.toLowerCase().contains(query.toLowerCase());
-    }).toList();
+    var filteredList =
+        ClientList.where((client) {
+          return client.name.toLowerCase().contains(query.toLowerCase());
+        }).toList();
     ClientList.assignAll(filteredList);
   }
+
   // show branch_id for login
   Future<int?> getbranchId() async {
-    int? branchId = await SharedPreferencesManager.getIntValue('branch_id');
-    return branchId;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('branch_id');
   }
-  // show user_id from login
+
   Future<int?> getUserId() async {
-    int? user_id = await SharedPreferencesManager.getIntValue('user_id');
-    return user_id;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
   }
 
-  Future<void> fetchUser() async {
-    int? branchId = await getbranchId();
+  // Future<void> fetchUser() async {
+  //   int? branchId = await getbranchId();
 
+  //   try {
+  //     isLoadings.value = true;
+  //     final Map<String, dynamic> params = {
+  //       'branch_id': branchId,
+  //     };
+
+  //     final res = await Get.find<ApiService>().get(
+  //       EndPoints.getStaff,
+  //       queryParameters: params,
+  //     );
+
+  //     final data = getPropertyFromJson(res.data, 'data');
+  //     StaffList = List.from((data as List).map((e) => StaffModel.fromJson(e)));
+
+  //   } catch (e) {
+  //     if (isClosed) {
+  //       return;
+  //     }
+  //     ExceptionHandler.handleException(e);
+  //   } finally {
+  //     isLoadings.value = false;
+  //   }
+  // }
+
+  // Future<void> fetchUser() async {
+  //   int? branchId = await getbranchId();
+  //   try {
+  //     isLoadings.value = true;
+  //     final res = await Get.find<ApiService>().get(
+  //       EndPoints.getStaff,
+  //       queryParameters: {'branch_id': branchId},
+  //     );
+  //     final data = getPropertyFromJson(res.data, 'data');
+
+  //     // data is null = no staff returned, just show empty list
+  //     // if (data == null || data is! List) {
+  //     //   StaffList = [];
+  //     //   return;
+  //     // }
+  //     if (data == null || data is! List) {
+  //       StaffList.clear(); // ← instead of StaffList = []
+  //       return;
+  //     }
+
+  //     // StaffList = List.from((data).map((e) => StaffModel.fromJson(e)));
+  //     StaffList.assignAll(List.from((data).map((e) => StaffModel.fromJson(e))));
+  //   } catch (e) {
+  //     if (isClosed) return;
+  //     ExceptionHandler.handleException(e);
+  //   } finally {
+  //     isLoadings.value = false;
+  //   }
+  // }
+  Future<void> fetchUser() async {
     try {
       isLoadings.value = true;
-      final Map<String, dynamic> params = {
-        'branch_id': branchId,
-      };
 
-      final res = await Get.find<ApiService>().get(
-        EndPoints.getStaff,
-        queryParameters: params,
-      );
+      // ← load from local DB instead of API
+      final localStaff = await DatabaseHelper.instance.queryAllRowsStaff();
 
-      final data = getPropertyFromJson(res.data, 'data');
-      StaffList = List.from((data as List).map((e) => StaffModel.fromJson(e)));
-
-    } catch (e) {
-      if (isClosed) {
+      if (localStaff.isEmpty) {
+        // if (localStaff.isEmpty && StaffList.isEmpty) {
+        // DialogManager.showDialog(
+        //   title: 'No Staff Found',
+        //   subTitle: 'Please sync data first before using this feature.',
+        // );
+        // fallback to API if local is empty
+        int? branchId = await getbranchId();
+        final res = await Get.find<ApiService>().get(
+          EndPoints.getStaff,
+          queryParameters: {'branch_id': branchId},
+        );
+        final data = getPropertyFromJson(res.data, 'data');
+        if (data == null || data is! List) {
+          StaffList.clear();
+          return;
+        }
+        StaffList.assignAll(
+          List.from((data).map((e) => StaffModel.fromJson(e))),
+        );
         return;
       }
+
+      StaffList.assignAll(localStaff); // ← use synced staff data
+    } catch (e) {
+      if (isClosed) return;
       ExceptionHandler.handleException(e);
     } finally {
       isLoadings.value = false;
     }
   }
+
   void onClientChanged(ClientPrepaidModel? selectedClient) {
     clientSelected = selectedClient;
   }
+
   // Method to handle staff selection change
   Future<void> onStaffChanged(StaffModel? selectedStaff) async {
     StaffSelected = selectedStaff;
-    await fetchClient(selectedStaff?.id); // Fetch clients based on selected staff
+    ClientList.clear(); // ← clear previous clients
+    clientSelected = null; // ← reset client selection
+    await fetchClient(staffId: selectedStaff?.id);
   }
-  Future<void> fetchClient(num? staffId) async {
-    int? branchId = await getbranchId();
+  // Future<void> fetchClient(num? staffId) async {
+  //   int? branchId = await getbranchId();
 
+  //   try {
+  //     isLoading.value = true;
+  //     final Map<String, dynamic> params = {
+  //       'branch_id': branchId,
+  //       'user_id': staffId,
+  //     };
+  //     final res = await Get.find<ApiService>().get(
+  //       EndPoints.getClient,
+  //       queryParameters: params,
+  //     );
+  //     final data = getPropertyFromJson(res.data, 'data');
+  //     ClientList = List.from(
+  //       (data as List).map((e) => ClientPrepaidModel.fromJson(e)),
+  //     );
+  //   } catch (e) {
+  //     if (isClosed) {
+  //       return;
+  //     }
+  //     ExceptionHandler.handleException(e);
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+  Future<void> fetchClient({num? staffId}) async {
+    int? branchId = await getbranchId();
+    int? userId = staffId != null ? staffId.toInt() : await getUserId();
     try {
       isLoading.value = true;
-      final Map<String, dynamic> params = {
-        'branch_id': branchId,
-        'user_id': staffId,
-      };
       final res = await Get.find<ApiService>().get(
         EndPoints.getClient,
-        queryParameters: params,
+        queryParameters: {'branch_id': branchId, 'user_id': userId},
       );
       final data = getPropertyFromJson(res.data, 'data');
-      ClientList = List.from((data as List).map((e) => ClientPrepaidModel.fromJson(e)));
-    } catch (e) {
-      if (isClosed) {
+      if (data == null || data is! List) {
+        ClientList.clear();
         return;
       }
+      ClientList.assignAll(
+        List.from((data).map((e) => ClientPrepaidModel.fromJson(e))),
+      );
+    } catch (e) {
+      if (isClosed) return;
       ExceptionHandler.handleException(e);
     } finally {
       isLoading.value = false;
     }
   }
+  // Future<void> submitBooking() async {
+  //   try {
+  //     int? user_id = await getUserId();
+  //     dio.FormData formData = dio.FormData.fromMap({
+  //       // This static because of feature removed
+  //       'loan_id': clientSelected?.id,
+  //       'amount': double.parse(totalAmountCtl.text.replaceAll(",", "")),
+  //       'user_id': user_id,
+  //       'currency_id': 2,
+  //       'description': descriptionCtl.text,
+  //       'geteway_id': 2,
+  //       'repayment_for_id': StaffSelected?.id,
+  //     });
 
+  //     // int? maxId = await DatabaseHelper.instance.getCollectedMaxId();
+  //     // ClientList =
+  //     //     ClientList.where(
+  //     //       (client) => client.id == clientSelected?.id,
+  //     //     ).toList();
+  //     int? maxId = await DatabaseHelper.instance.getCollectedMaxId();
+  //     ClientList.assignAll(
+  //       ClientList.where((client) => client.id == clientSelected?.id).toList(),
+  //     );
 
+  //     await DatabaseHelper.instance.insertCollected({
+  //       'id': maxId,
+  //       'client': ClientList[0].name + "(បង់ប្រាក់ជំនួស)",
+  //       'loan_officer': user_id,
+  //       'created_by_id': user_id,
+  //       'branch': "",
+  //       'client_id': 0,
+  //       'loan_id': clientSelected?.id,
+  //       'client_code': "",
+  //       'photo': "",
+  //       'total_repayment': double.parse(
+  //         totalAmountCtl.text.replaceAll(",", ""),
+  //       ),
+  //       'amount_penalty': 0,
+  //       'currency_id': 2,
+  //       'description': "Post Repayment",
+  //       'gateway_id': 1,
+  //       "status_pay": "មិនទាន់អនុម័ត",
+  //       'submitted_on': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+  //       'syncedate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+  //       'synced': 1,
+  //     });
 
+  //     await Get.find<ApiService>().post(
+  //       EndPoints.prePaid,
+  //       formData,
+  //       isShowLoading: true,
+  //     );
+
+  //     DialogManager.showDialog(
+  //       title: LocaleKeys.successfully.tr,
+  //       subTitle: LocaleKeys.youHavesuccessfullyCreatedTheBooking.tr,
+  //       onPressed: () => Get.back(),
+  //     );
+  //   } catch (e) {
+  //     if (isClosed) {
+  //       return;
+  //     }
+  //     ExceptionHandler.handleException(e);
+  //   }
+  // }
   Future<void> submitBooking() async {
     try {
       int? user_id = await getUserId();
@@ -130,38 +300,49 @@ class PayfoeachotherController extends GetxController with GetSingleTickerProvid
         'loan_id': clientSelected?.id,
         'amount': double.parse(totalAmountCtl.text.replaceAll(",", "")),
         'user_id': user_id,
+        'repayment_for_id': StaffSelected?.id,
         'currency_id': 2,
         'description': descriptionCtl.text,
         'geteway_id': 2,
-        'repayment_for_id': StaffSelected?.id,
       });
 
       int? maxId = await DatabaseHelper.instance.getCollectedMaxId();
-      ClientList = ClientList.where((client) => client.id == clientSelected?.id).toList();
+      // ClientList =
+      //     ClientList.where(
+      //       (client) => client.id == clientSelected?.id,
+      //     ).toList();
+      final matched =
+          ClientList.where(
+            (client) => client.id == clientSelected?.id,
+          ).toList();
+      if (matched.isEmpty) return;
 
-      await DatabaseHelper.instance.insertCollected(
-
-          {
-            'id': maxId,
-            'client': ClientList[0].name + "(បង់ប្រាក់ជំនួស)",
-            'loan_officer': user_id,
-            'created_by_id': user_id,
-            'branch': "",
-            'client_id': 0,
-            'loan_id': clientSelected?.id,
-            'client_code': "",
-            'photo': "",
-            'total_repayment': double.parse(totalAmountCtl.text.replaceAll(",", "")),
-            'amount_penalty' : 0,
-            'currency_id': 2,
-            'description': "Post Repayment",
-            'gateway_id': 1,
-            "status_pay": "មិនទាន់អនុម័ត",
-            'submitted_on': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-            'syncedate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-            'synced': 1
-          }
-      );
+      await DatabaseHelper.instance.insertCollected({
+        // 'id': maxId,
+        // 'client': ClientList[0].name + "(បង់ទុក)",
+        'id': maxId,
+        // 'client': matched[0].name + "(បង់ទុក)",
+        'client':
+            matched[0].name + "(បង់ជំនួស ${StaffSelected?.full_name ?? ''})",
+        'loan_officer': StaffSelected?.id,
+        'created_by_id': user_id,
+        'branch': "",
+        'client_id': 0,
+        'loan_id': clientSelected?.id,
+        'client_code': "",
+        'photo': "",
+        'total_repayment': double.parse(
+          totalAmountCtl.text.replaceAll(",", ""),
+        ),
+        'amount_penalty': 0,
+        'currency_id': 2,
+        'description': "Post Repayment",
+        'gateway_id': 1,
+        "status_pay": "មិនទាន់អនុម័ត",
+        'submitted_on': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'syncedate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'synced': 1,
+      });
 
       await Get.find<ApiService>().post(
         EndPoints.prePaid,
@@ -169,25 +350,24 @@ class PayfoeachotherController extends GetxController with GetSingleTickerProvid
         isShowLoading: true,
       );
 
-
-
       DialogManager.showDialog(
         title: LocaleKeys.successfully.tr,
-        subTitle: LocaleKeys.youHavesuccessfullyCreatedTheBooking.tr,
+        subTitle: LocaleKeys.youHaveSuccessfullyCreated.tr,
         onPressed: () => Get.back(),
       );
     } catch (e) {
       if (isClosed) {
         return;
       }
+      DialogManager.hideLoading();
       ExceptionHandler.handleException(e);
     }
   }
+
   final RxList<File> imageFiles = RxList<File>([File('')]);
 
   final int totalImage = 5;
   bool isNoMoreUpload() {
     return imageFiles.length == totalImage + 1; // 1 is for placeholder image
   }
-
 }
