@@ -92,20 +92,122 @@ class TransferDataController extends GetxController {
         .replaceAll('.00', '');
   }
 
+  // Future<void> sendDataToServer() async {
+  //   WakelockPlus.enable();
+  //   int? branchId = await getbranchId();
+  //   int? user_id = await getUserId();
+  //   try {
+  //     isLoading.value = true; // Start loading
+  //     progress.value = 0.0; // Reset progress
+  //     repayment.value = await DatabaseHelper.instance.queryAllRowsCollected();
+  //     repayment.value =
+  //         repayment.value.where((item) => item.synced == "0").toList();
+
+  //     var i = repayment.value.length;
+  //     for (var item in repayment.value) {
+  //       try {
+  //         await DatabaseHelper.instance.updateCollected({
+  //           'id': item.id,
+  //           'client': item.client,
+  //           'loan_officer': item.loan_officer,
+  //           'branch': branchId,
+  //           'client_id': item.client_id,
+  //           'loan_id': item.loan_id,
+  //           'client_code': item.client_code,
+  //           'photo': item.photo,
+  //           'submitted_on': item.submitted_on,
+  //           'total_repayment': item.total_repayment,
+  //           'amount_penalty': item.amount_penalty,
+  //           'status_pay': 'មិនទាន់អនុម័ត',
+  //           'syncedate': item.submitted_on,
+  //           'synced': 1,
+  //         });
+  //       } catch (e) {
+  //         print("Sync failed: $e");
+  //         DialogManager.showDialog(
+  //           title: LocaleKeys.error.tr,
+  //           subTitle: LocaleKeys.syncFailed.tr,
+  //         );
+
+  //         return;
+  //       }
+  //       // Simulate sending item to server
+  //       dio.FormData postData = dio.FormData.fromMap({
+  //         'loan_id': item.loan_id,
+  //         'amount': item.total_repayment,
+  //         'amount_penalty': item.amount_penalty,
+  //         'receipt': '',
+  //         'date': item.submitted_on,
+  //         'currency_id': 2,
+  //         'created_by_id': user_id,
+  //         'description': "Post Repayment",
+  //         'gateway_id': 1,
+  //       });
+
+  //       await Get.find<ApiService>().post(
+  //         EndPoints.repaymentStore,
+  //         postData,
+  //         isShowLoading: true,
+  //       );
+
+  //       await Future.delayed(Duration(seconds: 1)); // Simulate delay
+  //       i++;
+  //       progress.value = i / 10;
+  //     }
+  //     // Show success dialog
+  //     DialogManager.showDialog(
+  //       title: LocaleKeys.successfully.tr,
+  //       subTitle: LocaleKeys.youHavesuccessfullysyncData.tr,
+  //       onPressed: () => Get.back(),
+  //     );
+  //   } catch (e) {
+  //     // Handle any errors
+  //     print("Sync failed: $e");
+  //     DialogManager.showDialog(
+  //       title: LocaleKeys.error.tr,
+  //       subTitle: LocaleKeys.syncFailed.tr,
+  //       onPressed: () => Get.back(),
+  //     );
+  //   } finally {
+  //     isLoading.value = false;
+  //     // WakelockPlus.disable();
+  //   }
+  // }
   Future<void> sendDataToServer() async {
     WakelockPlus.enable();
     int? branchId = await getbranchId();
     int? user_id = await getUserId();
     try {
-      isLoading.value = true; // Start loading
-      progress.value = 0.0; // Reset progress
+      isLoading.value = true;
+      progress.value = 0.0;
       repayment.value = await DatabaseHelper.instance.queryAllRowsCollected();
       repayment.value =
           repayment.value.where((item) => item.synced == "0").toList();
 
-      var i = repayment.value.length;
+      var i = 0;
+      int failed = 0;
+      int total = repayment.value.length;
+
       for (var item in repayment.value) {
         try {
+          final Map<String, dynamic> postData = {
+            'loan_id': item.loan_id,
+            'amount': item.total_repayment,
+            'amount_penalty': item.amount_penalty,
+            'receipt': '',
+            'date': item.submitted_on,
+            'currency_id': 2,
+            'created_by_id': user_id,
+            'description': "Post Repayment",
+            'gateway_id': 1,
+          };
+
+          await Get.find<ApiService>().post(
+            EndPoints.repaymentStore,
+            postData,
+            isShowLoading: false,
+          );
+
           await DatabaseHelper.instance.updateCollected({
             'id': item.id,
             'client': item.client,
@@ -122,46 +224,35 @@ class TransferDataController extends GetxController {
             'syncedate': item.submitted_on,
             'synced': 1,
           });
+
+          i++;
+          progress.value = total > 0 ? i / total : 0;
         } catch (e) {
           print("Sync failed: $e");
-          DialogManager.showDialog(
-            title: LocaleKeys.error.tr,
-            subTitle: LocaleKeys.syncFailed.tr,
-          );
-
-          return;
+          failed++;
         }
-        // Simulate sending item to server
-        dio.FormData postData = dio.FormData.fromMap({
-          'loan_id': item.loan_id,
-          'amount': item.total_repayment,
-          'amount_penalty': item.amount_penalty,
-          'receipt': '',
-          'date': item.submitted_on,
-          'currency_id': 2,
-          'created_by_id': user_id,
-          'description': "Post Repayment",
-          'gateway_id': 1,
-        });
-
-        await Get.find<ApiService>().post(
-          EndPoints.repaymentStore,
-          postData,
-          isShowLoading: true,
-        );
-
-        await Future.delayed(Duration(seconds: 1)); // Simulate delay
-        i++;
-        progress.value = i / 10;
       }
-      // Show success dialog
-      DialogManager.showDialog(
-        title: LocaleKeys.successfully.tr,
-        subTitle: LocaleKeys.youHavesuccessfullysyncData.tr,
-        onPressed: () => Get.back(),
-      );
+
+      if (failed == 0) {
+        DialogManager.showDialog(
+          title: LocaleKeys.successfully.tr,
+          subTitle: LocaleKeys.youHavesuccessfullysyncData.tr,
+          onPressed: () => Get.back(),
+        );
+      } else if (i > 0) {
+        DialogManager.showDialog(
+          title: LocaleKeys.error.tr,
+          subTitle: "$i/$total synced. $failed failed.",
+          onPressed: () => Get.back(),
+        );
+      } else {
+        DialogManager.showDialog(
+          title: LocaleKeys.error.tr,
+          subTitle: LocaleKeys.syncFailed.tr,
+          onPressed: () => Get.back(),
+        );
+      }
     } catch (e) {
-      // Handle any errors
       print("Sync failed: $e");
       DialogManager.showDialog(
         title: LocaleKeys.error.tr,
@@ -170,7 +261,7 @@ class TransferDataController extends GetxController {
       );
     } finally {
       isLoading.value = false;
-      // WakelockPlus.disable();
+      WakelockPlus.disable();
     }
   }
 
